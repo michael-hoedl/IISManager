@@ -1,0 +1,125 @@
+﻿@page "/pools"
+@using IISManager.Core.Infrastructure.Services
+@using IISManager.Core.Domain.Common
+@using IISManager.Core.Domain.Enums
+@inject IISManagerService ManagerService
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<PageTitle>IIS Manager</PageTitle>
+
+<MudText Typo="Typo.h3" GutterBottom="true">App Pools</MudText>
+@if (pools == null)
+{
+	<MudProgressCircular Color="Color.Default" Indeterminate="true" />
+}
+else
+{
+	<MudStack Justify="Justify.SpaceBetween" Row="true" Style="margin-bottom: 1vh;">
+		<MudIconButton Icon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" OnClick="async () => await CreateAppPool()"></MudIconButton>
+		<MudIconButton Icon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" Color="Color.Primary" OnClick="() => RefreshDataSource()"></MudIconButton>
+	</MudStack>
+	<MudTable Items="pools" Hover="true" SortLabel="Sort By" Elevation="0">
+		
+		<HeaderContent>
+			<MudTh Style="width:1em"></MudTh>
+			<MudTh><MudTableSortLabel InitialDirection="SortDirection.Ascending" SortBy="new Func<AppPool, object>(x=>x.Name)">Name</MudTableSortLabel></MudTh>
+			<MudTh><MudTableSortLabel SortBy="new Func<AppPool, object>(x=>x.Status)">Status</MudTableSortLabel></MudTh>
+			<MudTh><MudTableSortLabel SortBy="new Func<AppPool, object>(x=>x.Applications.Count)">Applications</MudTableSortLabel></MudTh>
+			<MudTh>Actions</MudTh>
+			<MudTh>Detail</MudTh>
+		</HeaderContent>
+		<RowTemplate>
+			<MudTd>
+				<MudIcon Icon="@Icons.Custom.Brands.MicrosoftWindows" />
+			</MudTd>
+			<MudTd DataLabel="Name">
+				@context.Name
+			</MudTd>
+			<MudTd DataLabel="Status">@context.Status</MudTd>
+			<MudTd DataLabel="Applications">@context.Applications.Count</MudTd>
+			<MudTd>
+				<MudIconButton Icon="@Icons.Material.Filled.PlayArrow" OnClick="() => UpdateState(context, AppPoolActionState.Start)" Disabled="context.Status == AppPoolStatus.Starting || context.Status == AppPoolStatus.Started"></MudIconButton>
+				<MudIconButton Icon="@Icons.Material.Filled.Stop" OnClick="() => UpdateState(context, AppPoolActionState.Stop)" Disabled="context.Status == AppPoolStatus.Stopping || context.Status == AppPoolStatus.Stopped"></MudIconButton>
+				<MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="() => UpdateState(context, AppPoolActionState.Recycle)" Disabled="context.Status != AppPoolStatus.Started"></MudIconButton>
+				<MudIconButton Icon="@Icons.Material.Filled.Delete" OnClick="() => Delete(context)"></MudIconButton>
+			</MudTd>
+			<MudTd>
+				<MudButton OnClick="() => OpenDialog(context)" Variant="Variant.Filled" Color="Color.Primary">Open</MudButton>
+			</MudTd>
+		</RowTemplate>
+		<PagerContent>
+			<MudTablePager PageSizeOptions="new int[]{10, 20, 50}" />
+		</PagerContent>
+	</MudTable>
+}
+
+
+@code {
+	private IEnumerable<AppPool> pools = Enumerable.Empty<AppPool>();
+
+	protected override void OnInitialized()
+	{
+		RefreshDataSource();
+	}
+
+	private void UpdateState(AppPool pool, AppPoolActionState toSet)
+	{
+		ManagerService.SetState(pool, toSet);
+
+		RefreshDataSource();
+
+		var verb = toSet switch
+		{
+			AppPoolActionState.Start => "started",
+			AppPoolActionState.Stop => "stopped",
+			AppPoolActionState.Recycle => "recylced",
+			_ => string.Empty
+		};
+
+		Snackbar.Add($"App-Pool {pool.Name} {verb}", Severity.Info, config =>
+		{
+			config.HideIcon = true;
+		});
+	}
+
+	private void OpenDialog(AppPool pool)
+	{
+		var diaParams = new DialogParameters();
+		diaParams.Add("Pool", pool);
+
+		var options = new DialogOptions { CloseOnEscapeKey = true };
+		DialogService.Show<PoolView>(pool.Name, diaParams, options);
+	}
+
+	private async Task CreateAppPool()
+	{
+		var options = new DialogOptions { CloseOnEscapeKey = true };
+		await (await DialogService.ShowAsync<PoolAdd>("Add app pool")).Result;
+
+		//IIS may not have added the app-pool when calling RefreshDataSource instantly after creating the app-pool,
+		// resulting in an exception as the state of the pool could not be retrieved.
+		await Task.Delay(100);
+
+		RefreshDataSource();
+	}
+
+	private void RefreshDataSource()
+	{
+		pools = ManagerService.GetAppPools();
+	}
+
+	private async Task Delete(AppPool pool)
+	{
+		bool? delete = await DialogService.ShowMessageBox(
+			"Warning",
+			"Deleting can not be undone!",
+			yesText: "Delete!", cancelText: "Cancel");
+
+		if (delete.HasValue && delete.Value)
+		{
+			ManagerService.DeleteAppPool(pool);
+			RefreshDataSource();
+		}
+	}
+}

@@ -1,0 +1,25 @@
+﻿@using IISManager.Core.Infrastructure.Services;
+@inject IISManagerService ManagerService;
+
+<MudDialog>
+	<DialogContent>
+		<MudStack>
+			<MudTextField @bind-Value="Name" Label="Name" Variant="Variant.Text" autocomplete=@("mud-disabled-"+Guid.NewGuid()) />
+		</MudStack>
+	</DialogContent>
+	<DialogActions>
+		<MudButton OnClick="Cancel">Cancel</MudButton>
+		<MudButton Color="Color.Primary" OnClick="async () => await Submit()">Ok</MudButton>
+	</DialogActions>
+</MudDialog>
+@code {
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+	public string Name { get; set; }
+
+	private async Task Submit()
+	{
+		await ManagerService.CreateLogicalGroup(Name);
+		MudDialog.Close(DialogResult.Ok(true));
+	}
+	private void Cancel() => MudDialog.Cancel();
+}

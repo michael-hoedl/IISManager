@@ -1,0 +1,29 @@
+﻿@using IISManager.Core.Infrastructure.Services
+@using IISManager.Core.Domain.Common
+@using IISManager.Core.Domain.Enums
+
+<MudDialog>
+	<DialogContent>
+		<h3>Applications</h3>
+		<MudTable Items="Pool.Applications">
+			<HeaderContent>
+				<MudTh>Path</MudTh>
+				<MudTh>Physical Path</MudTh>
+			</HeaderContent>
+			<RowTemplate>
+				<MudTd DataLabel="Path">@context.Path</MudTd>
+				<MudTd DataLabel="Path">@context.PhysicalPath</MudTd>
+			</RowTemplate>
+		</MudTable>
+
+	</DialogContent>
+	<DialogActions>
+		<MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">Ok</MudButton>
+	</DialogActions>
+</MudDialog>
+@code {
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+	[Parameter] public AppPool Pool { get; set; }
+
+	void Submit() => MudDialog.Close(DialogResult.Ok(true));
+}

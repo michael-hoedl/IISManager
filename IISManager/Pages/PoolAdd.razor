@@ -1,0 +1,36 @@
+﻿@using IISManager.Core.Infrastructure.Services
+@using IISManager.Core.Domain.Common
+@using IISManager.Core.Domain.Enums
+@inject IISManagerService ManagerService;
+@inject ISnackbar Snackbar
+
+<MudDialog>
+	<DialogContent>
+		<MudStack>
+			<MudTextField @bind-Value="Name" Label="Name" Variant="Variant.Text" autocomplete=@("mud-disabled-"+Guid.NewGuid()) />
+			<MudCheckBox @bind-Checked="StartImmediatley">Start Immediatley</MudCheckBox>
+		</MudStack>
+	</DialogContent>
+	<DialogActions>
+		<MudButton OnClick="Cancel">Cancel</MudButton>
+		<MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Submit">Ok</MudButton>
+	</DialogActions>
+</MudDialog>
+@code {
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+	public string Name { get; set; }
+	public bool StartImmediatley { get; set; } = true;
+
+	private void Submit(){
+		if (!ManagerService.AppPoolExists(Name))
+		{
+			ManagerService.CreateAppPool(Name, StartImmediatley);
+			MudDialog.Close(DialogResult.Ok(true));
+		}
+		else
+		{
+			Snackbar.Add("Pool already exists", Severity.Error);
+		}
+	}
+	private void Cancel() => MudDialog.Cancel();
+}

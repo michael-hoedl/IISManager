@@ -1,0 +1,105 @@
+﻿@page "/logicalPools"
+@using IISManager.Core.Infrastructure.Infrastructure.Persistance;
+@using IISManager.Core.Infrastructure.Services
+@using IISManager.Core.Domain.Common
+@using IISManager.Core.Domain.Enums
+@using Microsoft.EntityFrameworkCore;
+@inject IISManagerService ManagerService
+@inject IDialogService DialogService
+
+<MudText Typo="Typo.h3" GutterBottom="true">Logical App Pools</MudText>
+
+<MudStack Justify="Justify.SpaceBetween" Row="true" Style="margin-bottom: 1vh;">
+	<MudIconButton Icon="@Icons.Material.Filled.Add" Variant="Variant.Filled" Color="Color.Primary" OnClick="async () => await CreateLogicalGroup()"></MudIconButton>
+	<MudIconButton Icon="@Icons.Material.Filled.Refresh" Variant="Variant.Filled" Color="Color.Primary" OnClick="() => RefreshDataSource()"></MudIconButton>
+</MudStack>
+
+<MudGrid>
+
+	@foreach (var group in logicalGroups)
+	{
+		<MudItem xs="6">
+			<MudCard>
+				<MudCardHeader>
+					<CardHeaderContent>
+						<MudStack Justify="Justify.SpaceBetween" Row="true">
+							<MudText Typo="Typo.h5">@group.Name</MudText>
+							<MudStack Justify="Justify.SpaceBetween" Row="true">
+								<MudIconButton Icon="@Icons.Material.Filled.Edit" Color="Color.Primary" OnClick="async () => await OpenEditDialog(group)"></MudIconButton>
+								<MudIconButton Icon="@Icons.Material.Filled.Delete" Color="Color.Primary" OnClick="async () => await Delete(group)"></MudIconButton>
+							</MudStack>
+						</MudStack>
+					</CardHeaderContent>
+				</MudCardHeader>
+				<MudCardContent>
+
+					<MudText>@group.GetAppPools(ManagerService).Where(x => x.Status == AppPoolStatus.Started || x.Status == AppPoolStatus.Starting).Count() out of @group.AssignedAppPoolNames.Count running</MudText>
+
+					<MudTable Items="group.AssignedAppPoolNames">
+						<HeaderContent>
+							<MudTh>Name</MudTh>
+						</HeaderContent>
+						<RowTemplate>
+							<MudTd DataLabel="Name">@context.Name</MudTd>
+						</RowTemplate>
+					</MudTable>
+				</MudCardContent>
+				<MudCardActions Style="flex-direction: row-reverse;">
+					<MudIconButton Icon="@Icons.Material.Filled.Refresh" OnClick="async () => await UpdateState(group, AppPoolActionState.Recycle)"></MudIconButton>
+					<MudIconButton Icon="@Icons.Material.Filled.Stop" OnClick="async () => await UpdateState(group, AppPoolActionState.Stop)"></MudIconButton>
+					<MudIconButton Icon="@Icons.Material.Filled.PlayArrow" OnClick="async () => await UpdateState(group, AppPoolActionState.Start)"></MudIconButton>
+				</MudCardActions>
+			</MudCard>
+		</MudItem>
+	}
+</MudGrid>
+
+@code {
+	private IEnumerable<AppPoolGroup> logicalGroups;
+
+	protected override async Task OnInitializedAsync()
+	{
+		await RefreshDataSource();
+	}
+
+	private async Task RefreshDataSource()
+	{
+		logicalGroups = await ManagerService.GetAppPoolGroups();
+	}
+
+	private async Task UpdateState(AppPoolGroup group, AppPoolActionState state)
+	{
+		ManagerService.SetState(group, state);
+
+		logicalGroups = await ManagerService.GetAppPoolGroups();
+	}
+
+	private async Task CreateLogicalGroup()
+	{
+		await (await DialogService.ShowAsync<AppPoolGroupAdd>("Add app pool group")).Result;
+		await RefreshDataSource();
+	}
+
+	private async Task OpenEditDialog(AppPoolGroup group)
+	{
+		var diaParams = new DialogParameters();
+		diaParams.Add("Group", group);
+
+		var options = new DialogOptions { CloseOnEscapeKey = true };
+		await (await DialogService.ShowAsync<AppPoolGroupEdit>(group.Name, diaParams, options)).Result;
+	}
+
+	private async Task Delete(AppPoolGroup group)
+	{
+		bool? delete = await DialogService.ShowMessageBox(
+			"Warning",
+			"Deleting can not be undone!",
+			yesText: "Delete!", cancelText: "Cancel");
+
+		if (delete.HasValue && delete.Value)
+		{
+			await ManagerService.DeleteAppPoolGroup(group);
+			await RefreshDataSource();
+		}
+	}
+}

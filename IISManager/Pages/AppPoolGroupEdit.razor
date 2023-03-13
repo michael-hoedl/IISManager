@@ -1,0 +1,56 @@
+﻿@using IISManager.Core.Infrastructure.Infrastructure.Persistance;
+@using IISManager.Core.Infrastructure.Services
+@using IISManager.Core.Domain.Common
+@using IISManager.Core.Domain.Enums
+@using Microsoft.EntityFrameworkCore;
+@using System.Diagnostics;
+@inject IISManagerService ManagerService;
+@inject ISnackbar Snackbar
+
+<MudDialog>
+	<DialogContent>
+		<MudIconButton Icon="@Icons.Material.Filled.Add" Color="Color.Primary" Variant="Variant.Filled" OnClick="() => AddPool()" Style="margin-bottom: 1vh;"/>
+		<MudTable Items="Group.AssignedAppPoolNames">
+			<HeaderContent>
+				<MudTh>Name</MudTh>
+			</HeaderContent>
+			<RowTemplate>
+				<MudTd DataLabel="Name">@context.Name</MudTd>
+			</RowTemplate>
+			<RowEditingTemplate>
+				<MudTd DataLabel="Name">
+					<MudTextField @bind-Value="@context.Name" />
+				</MudTd>
+			</RowEditingTemplate>
+		</MudTable>
+
+	</DialogContent>
+	<DialogActions>
+		<MudButton Color="Color.Primary" OnClick="async () => await Submit()">Ok</MudButton>
+	</DialogActions>
+</MudDialog>
+
+@code {
+	[CascadingParameter] MudDialogInstance MudDialog { get; set; }
+	[Parameter] public AppPoolGroup Group { get; set; }
+
+	private async Task Submit()
+	{
+		if(Group.AssignedAppPoolNames.Any(x => string.IsNullOrEmpty(x.Name)))
+		{
+			Snackbar.Add("Pool name may not be null", Severity.Error);
+		}
+		else
+		{
+			await ManagerService.UpdateAppPoolGroup(Group);
+			MudDialog.Close(DialogResult.Ok(true));
+		}
+	}
+
+	private void Cancel() => MudDialog.Cancel();
+
+	private void AddPool()
+	{
+		Group.AssignedAppPoolNames.Add(new AppPoolGroupAppPool());
+	}
+}
